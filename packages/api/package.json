@@ -1,0 +1,32 @@
+{
+  "name": "@artisan/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "mcp": "tsx src/mcp/server.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@artisan/db": "workspace:*",
+    "@fastify/jwt": "^10.0.0",
+    "@fastify/swagger": "^9.7.0",
+    "@fastify/swagger-ui": "^5.2.5",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "@sinclair/typebox": "^0.34.0",
+    "bullmq": "^5.70.4",
+    "dotenv": "^16.4.0",
+    "drizzle-orm": "^0.39.0",
+    "fastify": "^5.2.0",
+    "socket.io": "^4.8.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/supertest": "^7.2.0",
+    "supertest": "^7.2.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.18"
+  }
+}

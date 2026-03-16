@@ -1,0 +1,178 @@
+# PROGRESS.md — Artisan Furniture Co.
+
+This file is updated by Claude after every completed task. It is read at the start of every session to resume exactly where we left off.
+
+---
+
+## Current Status
+
+**Active Phase:** Phase 4 — COMPLETE
+**Last Updated:** 2026-03-14
+**Next Action:** Phase 5 — AI agents
+
+---
+
+## Completed Tasks
+
+### Phase 1 — Foundation
+- [x] Monorepo setup (pnpm workspaces, root package.json, tsconfig.json)
+- [x] Docker Compose (PostgreSQL 16, Redis 7, Ollama)
+- [x] Database package (`@artisan/db`) with Drizzle ORM
+- [x] Schema: all 10 tables (customers, orders, order_items, artisans, production_tasks, shipments, payments, events, agent_actions, notifications)
+- [x] Enums: 9 status types (order_status, production_status, shipment_status, etc.)
+- [x] Migration generated and applied to PostgreSQL
+- [x] Seed data: 3 customers, 5 artisans, 8 orders (across all lifecycle stages), 12 order items, 8 production tasks, 3 shipments, 6 payments, 5 events, 4 agent actions, 4 notifications
+- [x] Docker containers running and verified
+- [x] **Milestone achieved:** `docker compose up` + `pnpm db:seed` gives a fully populated database
+
+### Phase 2 — API + MCP (In Progress)
+- [x] Step 1: Created `@artisan/api` package (Fastify server, Typebox for validation)
+  - Fastify server running on port 3000 with auto-reload (`tsx watch`)
+  - `/health` endpoint verified
+  - `/api/test-db` confirms API ↔ database connection works
+  - Added `exports` field to `@artisan/db` package.json for monorepo imports
+  - Root script: `pnpm dev:api`
+- [x] Step 2: Service layer (order.service.ts — createOrder, listOrders, getOrderById, updateOrderStatus)
+  - Vitest + Supertest testing set up — 7 tests passing
+  - Run tests with `pnpm test` from root
+- [x] Step 3: REST routes + services for all 6 domains
+  - Orders: POST/GET/GET:id/PATCH:status (service + routes + Typebox validation)
+  - Customers: GET/GET:id (read-only for POC)
+  - Production: GET/GET:id/PATCH:status (auto-sets startedAt/completedAt)
+  - Logistics: GET/GET:id/POST/PATCH:status (auto-sets actualArrival on delivery)
+  - Payments: GET/GET:by-order/POST (record-keeping only, no real processing)
+  - Agent: GET/GET:pending/POST/PATCH:review (human-in-the-loop approval)
+  - 29 tests passing across 6 test files
+- [x] Step 4: Swagger docs at http://localhost:3000/docs
+  - @fastify/swagger + @fastify/swagger-ui
+  - 6 tag groups: Orders, Customers, Production, Logistics, Payments, Agent
+  - 16 paths auto-documented from Typebox schemas
+- [x] Step 5: JWT auth with @fastify/jwt
+  - POST /api/auth/login — returns JWT token (24h expiry)
+  - Single admin user (credentials in .env)
+  - All routes protected except /health, /docs, /api/auth/login
+  - Swagger UI has "Authorize" button for testing with tokens
+- [x] Step 6: MCP server with @modelcontextprotocol/sdk
+  - 14 MCP tools: create_order, get_order, list_orders, update_order_status, confirm_order, list_customers, get_customer, get_production_dashboard, update_production_status, create_shipment, update_shipment_status, escalate_to_human, log_agent_action, get_pending_escalations
+  - 4 MCP resources: orders://active, production://overview, escalations://pending, metrics://snapshot
+  - Stdio transport — run with `pnpm mcp`
+  - Tools call the same service layer as REST routes (shared logic)
+- [x] Step 7: End-to-end testing (Option B — thorough)
+  - 8 route test files + 1 MCP test file added
+  - Auth: 8 tests (login, invalid creds, public/protected routes, token validation)
+  - Orders: 7 tests, Customers: 3 tests, Production: 4 tests
+  - Logistics: 4 tests, Payments: 4 tests, Agent: 5 tests
+  - MCP: 11 tests (14 tools listed, tool calls verified, 4 resources read)
+  - **75 total tests passing across 14 test files**
+  - **Phase 2 milestone achieved:** Create/read/update orders via both REST API and MCP tools
+
+### Phase 3 — Event Queue
+- [x] Step 1: Installed BullMQ v5.70.4 and Socket.io v4.8.3
+- [x] Step 2: Queue definitions (`queue/queues.ts`)
+  - 3 queues: `business-events`, `agent-tasks`, `notifications`
+  - Redis connection from `REDIS_URL` in .env
+  - Helper functions: `emitBusinessEvent()`, `queueAgentTask()`, `sendNotification()`
+- [x] Step 3: Socket.io setup (`ws/socket.ts`)
+  - Real-time server attached to Fastify's HTTP server
+  - CORS configured for React dashboard (port 5173)
+  - `getIO()` helper for pushing events from workers
+- [x] Step 4: Workers (`queue/workers.ts`)
+  - Business Event Worker: handles `order.created`, `order.confirmed`, `production.completed`, `shipment.created`
+  - Agent Task Worker: placeholder for Phase 5 (logs tasks)
+  - Notification Worker: logs to console + pushes via Socket.io
+- [x] Step 5: Service layer wired to emit events
+  - `createOrder()` → emits `order.created` (dashboard notification)
+  - `updateOrderStatus(confirmed)` → emits `order.confirmed` (triggers production task creation)
+  - `updateProductionStatus(approved)` → checks all tasks, emits `production.completed` when all done
+  - `createShipment()` → emits `shipment.created`
+- [x] Step 6: Server wiring — workers start on boot, graceful shutdown on SIGINT/SIGTERM
+- [x] Step 7: End-to-end testing (manual)
+  - Confirmed: creating order → adding items → confirming → production tasks auto-created
+  - Confirmed: order.confirmed → agent task queued → agent worker received
+  - Confirmed: production.completed → shipment auto-created
+- [x] Step 8: Automated tests
+  - Queue tests: 5 tests (queue names, emitBusinessEvent, queueAgentTask, sendNotification)
+  - Worker integration tests: 3 tests (order.confirmed creates tasks, empty order skips, production.completed creates shipment)
+  - **83 total tests passing across 16 test files**
+  - **Phase 3 milestone achieved:** Confirming an order triggers automatic production task creation
+
+### Phase 4 — React Dashboard
+- [x] Step 1: Scaffolded `@artisan/dashboard` package
+  - Vite 8 + React 19 + TypeScript
+  - Tailwind CSS v4 with Vite plugin
+  - Vite proxy: `/api` requests forwarded to `localhost:3000`
+  - Root script: `pnpm dev:dashboard`
+- [x] Step 2: Routing and app layout
+  - React Router with 3 routes: `/` (Orders), `/production`, `/agent`
+  - Sidebar layout: dark sidebar with nav links, header bar, main content area
+  - Active page highlighting, page transition animations
+- [x] Step 3: API client + TanStack Query
+  - `lib/api.ts` — GET/POST/PATCH helpers with JWT token management
+  - `LoginForm.tsx` — auth gate shown before dashboard
+  - TanStack Query wired with QueryClient (caching, auto-refetch)
+  - 3 custom hook files: `useOrders.ts`, `useProduction.ts`, `useAgent.ts`
+- [x] Step 4: Orders Page
+  - Table with all orders, status badges (color-coded per status)
+  - Filter dropdown by status
+  - Click row to expand: customer info + order items list
+  - Quick action buttons to advance order to next status
+  - `StatusBadge` component shared across all pages
+- [x] Step 5: Production Kanban Board
+  - 6 columns: Pending, Assigned, In Progress, Quality Check, Approved, Rejected
+  - Color-coded column headers with task count badges
+  - Task cards: product type, artisan name/location, status badge
+  - Click to expand: material, description, dates, workshop
+  - Advance button to move tasks to next stage
+- [x] Step 6: Agent Control Page
+  - Pending Escalations section with yellow-bordered cards
+  - Approve/Reject buttons with optional review notes
+  - Confidence bar (color-coded: green >80%, yellow >50%, red <50%)
+  - Agent output data display
+  - Recent Activity feed table (agent type, action, order, confidence, status, review)
+- [x] Step 7: Socket.io real-time integration
+  - `useSocket` hook connects to API server's Socket.io
+  - Incoming events invalidate TanStack Query caches (auto-refetch)
+  - Toast notification system: `lib/toast.ts` + `ToastContainer.tsx`
+  - Toasts slide in from right, auto-dismiss after 5 seconds
+- [x] Step 8: Polish
+  - Improved login screen (dark background, rounded card, subtle animations)
+  - Header bar showing current page name
+  - Fade-in page transitions, custom scrollbar styling
+  - Green status indicator in sidebar footer
+  - **Phase 4 milestone achieved:** Full visual management of orders and agent actions
+
+---
+
+## Open Decisions / Questions
+
+- Machine RAM not yet confirmed (needed before Phase 5 for LLM model selection)
+- GitHub repo: not yet decided (local-only for now)
+
+---
+
+## Phase Checklist
+
+- [x] **Phase 1** — Monorepo + Docker + Database schema + Seed data
+- [x] **Phase 2** — Fastify API + MCP server + Swagger + JWT auth
+- [x] **Phase 3** — BullMQ queues + workers + Socket.io
+- [x] **Phase 4** — React dashboard
+- [ ] **Phase 5** — AI agents
+- [ ] **Phase 6** — Integration + end-to-end demo
+
+---
+
+## Notes
+
+- Session setup (CLAUDE.md, PROGRESS.md) completed on 2026-03-09
+- Fixed: removed `.js` extensions from imports (drizzle-kit CJS compatibility)
+- Fixed: dotenv path resolution to load `.env` from monorepo root
+- Fixed: added missing `CREATE TYPE` enum statements to migration SQL
+- Docker installed: Docker v29.2.1, Docker Compose v5.0.2
+- Phase 2 started: 2026-03-10
+- Chose Typebox over Zod for Fastify validation (native integration, zero adapter needed)
+- Phase 3 completed: 2026-03-11
+- Design decision: production tasks created on `order.confirmed` (not `order.created`) because items aren't added until after order creation
+- Seed data note: use `TRUNCATE ... RESTART IDENTITY CASCADE` before re-seeding to reset auto-increment IDs
+- Phase 4 completed: 2026-03-14
+- Dashboard styling is functional (Tailwind utilities) — shadcn/ui full setup deferred, can be added later for more polish
+- Dashboard runs on port 5173, API on port 3000 — Vite proxy handles `/api` forwarding

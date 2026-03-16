@@ -1,0 +1,54 @@
+# Artisan Furniture — Local Infrastructure
+# Run with: docker compose up -d
+# Stop with: docker compose down
+
+services:
+  # PostgreSQL — our main database
+  # Stores all business data: orders, customers, artisans, etc.
+  postgres:
+    image: postgres:16
+    container_name: artisan-postgres
+    environment:
+      POSTGRES_USER: artisan
+      POSTGRES_PASSWORD: artisan_secret
+      POSTGRES_DB: artisan_furniture
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U artisan -d artisan_furniture"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis — in-memory data store
+  # Used for job queues (BullMQ) in Phase 3
+  redis:
+    image: redis:7
+    container_name: artisan-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Ollama — local AI model runner
+  # Runs LLMs locally for AI agents in Phase 5
+  ollama:
+    image: ollama/ollama:latest
+    container_name: artisan-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+# Named volumes persist data even when containers restart
+volumes:
+  postgres-data:
+  redis-data:
+  ollama-data:

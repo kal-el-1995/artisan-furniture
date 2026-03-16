@@ -1,0 +1,76 @@
+// ─── Agent Routes ───────────────────────────────────────────
+//   GET   /api/agent/actions          — List all agent actions
+//   GET   /api/agent/actions/pending  — Get pending actions (awaiting approval)
+//   POST  /api/agent/actions          — Log a new agent action
+//   PATCH /api/agent/actions/:id      — Approve or reject an action
+
+import { Type } from "@sinclair/typebox";
+import type { FastifyInstance } from "fastify";
+import {
+  listAgentActions,
+  getPendingActions,
+  logAgentAction,
+  reviewAgentAction,
+} from "../services/agent.service.js";
+
+const IdParam = Type.Object({ id: Type.Number() });
+
+const LogActionBody = Type.Object({
+  agentType: Type.String(),
+  actionType: Type.String(),
+  input: Type.Unknown(),
+  output: Type.Unknown(),
+  status: Type.Optional(
+    Type.Union([
+      Type.Literal("pending"),
+      Type.Literal("approved"),
+      Type.Literal("executed"),
+      Type.Literal("rejected"),
+      Type.Literal("escalated"),
+    ])
+  ),
+  escalationReason: Type.Optional(Type.String()),
+});
+
+const ReviewActionBody = Type.Object({
+  status: Type.Union([Type.Literal("approved"), Type.Literal("rejected")]),
+  humanResponse: Type.Optional(Type.String()),
+});
+
+export async function agentRoutes(app: FastifyInstance) {
+  app.get("/api/agent/actions", { schema: { tags: ["Agent"] } }, async () => {
+    return listAgentActions();
+  });
+
+  app.get("/api/agent/actions/pending", { schema: { tags: ["Agent"] } }, async () => {
+    return getPendingActions();
+  });
+
+  app.post(
+    "/api/agent/actions",
+    { schema: { tags: ["Agent"], body: LogActionBody } },
+    async (request, reply) => {
+      const action = await logAgentAction(
+        request.body as typeof LogActionBody.static
+      );
+      return reply.code(201).send(action);
+    }
+  );
+
+  app.patch(
+    "/api/agent/actions/:id",
+    { schema: { tags: ["Agent"], params: IdParam, body: ReviewActionBody } },
+    async (request, reply) => {
+      const { id } = request.params as typeof IdParam.static;
+      const body = request.body as typeof ReviewActionBody.static;
+
+      const updated = await reviewAgentAction({ id, ...body });
+
+      if (!updated) {
+        return reply.code(404).send({ error: "Agent action not found" });
+      }
+
+      return updated;
+    }
+  );
+}

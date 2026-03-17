@@ -50,6 +50,12 @@ export function useSocket() {
       }
     });
 
+    // Listen for supervisor summary results
+    socket.on("agent:summary", () => {
+      addToast("Supervisor Agent generated a daily summary");
+      queryClient.invalidateQueries({ queryKey: ["agent-actions"] });
+    });
+
     socket.on("disconnect", () => {
       console.log("[Socket.io] Disconnected");
     });

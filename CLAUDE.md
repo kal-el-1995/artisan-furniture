@@ -40,10 +40,24 @@ At the very start of each new session, **before anything else**:
 
 1. Search the web for the latest Claude Code updates and new Anthropic features (use WebSearch with a query like "Claude Code latest updates" or "Anthropic new features [current month year]").
 2. Give Kal EL a brief, plain-English summary of anything new or noteworthy.
-3. Read `PROGRESS.md` to get up to speed on where we left off.
-4. Then proceed with whatever task is at hand.
+3. **If any new feature, tool, or capability is relevant to this project** (e.g., new MCP features, agent improvements, SDK updates, performance gains, or workflow enhancements that could simplify our build), **log it immediately** — add it to `CLAUDE.md` (in Section 11 below) if it affects how we build going forward, or to `PROGRESS.md` (in the Notes section) if it's a one-time opportunity or version-specific detail. This ensures we never forget a useful discovery.
+4. Read `PROGRESS.md` to get up to speed on where we left off.
+5. Then proceed with whatever task is at hand.
 
 This keeps us current and ensures we're always using the best available tools and practices.
+
+---
+
+## 11. Relevant Anthropic Updates Log
+
+New features or releases discovered during session startup that are relevant to this project.
+
+| Date | Feature | Why It Matters | Logged In |
+|------|---------|---------------|-----------|
+| 2026-03-16 | MCP Elicitation Support | MCP servers can now request structured input from users mid-task via interactive dialogs — useful for our agent escalation flow in Phase 5 | CLAUDE.md |
+| 2026-03-16 | Claude Agent SDK (Node.js + Python) | Official SDK for building custom AI agents programmatically. Could replace or enhance our hand-rolled agent architecture in Phase 5 | CLAUDE.md |
+| 2026-03-16 | Agent Teams (Opus 4.6) | Multiple agents can work in parallel on sub-tasks and coordinate — mirrors our Order Agent + Supervisor pattern | CLAUDE.md |
+| 2026-03-16 | /loop command in Claude Code | Run prompts on a recurring interval — handy for monitoring Docker services or watching test runs during development | CLAUDE.md |
 
 ---
 
@@ -158,8 +172,9 @@ We build in this order — each phase has a clear milestone before moving on:
 - **Business plan:** `Artisan-Furniture-Business-Plan.pdf` — full business context
 - **Product plan:** `product-plan.md` — full technical roadmap (production-grade vision)
 - **POC plan:** `poc-plan.md` — what we're actually building now (free, local, complete)
+- **Production notes:** `PRODUCTION-NOTES.md` — upgrade paths, tools to evaluate, and decisions to revisit when moving from POC to production
 
-When in doubt about scope, refer to `poc-plan.md`. When in doubt about the business, refer to the PDF.
+When in doubt about scope, refer to `poc-plan.md`. When in doubt about the business, refer to the PDF. When thinking about production upgrades, refer to `PRODUCTION-NOTES.md`.
 
 ---
 

@@ -15,6 +15,7 @@ import {
   listOrders,
   getOrderById,
   updateOrderStatus,
+  addOrderItem,
 } from "../services/order.service.js";
 
 // ─── Typebox Schemas ────────────────────────────────────────
@@ -84,6 +85,36 @@ export async function orderRoutes(app: FastifyInstance) {
       }
 
       return order;
+    }
+  );
+
+  // POST /api/orders/:id/items — Add an item to an order
+  app.post(
+    "/api/orders/:id/items",
+    {
+      schema: {
+        tags: ["Orders"],
+        params: IdParam,
+        body: Type.Object({
+          productType: Type.String(),
+          material: Type.Optional(Type.String()),
+          description: Type.Optional(Type.String()),
+          quantity: Type.Optional(Type.Number()),
+          unitPrice: Type.Optional(Type.String()),
+        }),
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params as typeof IdParam.static;
+      const body = request.body as {
+        productType: string;
+        material?: string;
+        description?: string;
+        quantity?: number;
+        unitPrice?: string;
+      };
+      const item = await addOrderItem({ orderId: id, ...body });
+      return reply.code(201).send(item);
     }
   );
 

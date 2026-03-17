@@ -93,6 +93,32 @@ export async function getOrderById(id: number) {
   return { ...order, customer, items };
 }
 
+// Add an item to an order
+type AddOrderItemInput = {
+  orderId: number;
+  productType: string;
+  material?: string;
+  description?: string;
+  quantity?: number;
+  unitPrice?: string;
+};
+
+export async function addOrderItem(input: AddOrderItemInput) {
+  const [item] = await db
+    .insert(orderItems)
+    .values({
+      orderId: input.orderId,
+      productType: input.productType,
+      material: input.material,
+      description: input.description,
+      quantity: input.quantity ?? 1,
+      unitPrice: input.unitPrice,
+    })
+    .returning();
+
+  return item;
+}
+
 // Update an order's status (e.g. draft → confirmed)
 export async function updateOrderStatus(input: UpdateOrderStatusInput) {
   const [updated] = await db

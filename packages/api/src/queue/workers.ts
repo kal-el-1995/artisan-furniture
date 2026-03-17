@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { createShipment } from "../services/logistics.service.js";
 import { queueAgentTask, sendNotification } from "./queues.js";
 import { getIO } from "../ws/socket.js";
+import { createLLM, processOrder, generateSummary } from "@artisan/agents";
 
 // ── What are Workers? ───────────────────────────────────────────────
 // Workers are background processes that watch a queue and do work
@@ -143,10 +144,89 @@ const businessEventWorker = new Worker(
 const agentTaskWorker = new Worker(
   "agent-tasks",
   async (job: Job) => {
-    const { taskType } = job.data;
+    const { taskType, orderId } = job.data;
     console.log(`  [Agent Worker] Received task: ${taskType}`);
     console.log(`  [Agent Worker] Data:`, JSON.stringify(job.data));
-    // Phase 5: This is where the AI agent will process the task
+
+    if (taskType === "review-artisan-assignment") {
+      try {
+        // Create an LLM instance and run the Order Agent
+        const llm = createLLM();
+        console.log(`  [Agent Worker] Starting Order Agent for order #${orderId}...`);
+        const result = await processOrder(llm, orderId);
+
+        console.log(`  [Agent Worker] Order #${orderId} result: ${result.decision}`);
+        console.log(`  [Agent Worker] Tools used: ${result.toolsUsed.join(", ")}`);
+        console.log(`  [Agent Worker] Reasoning: ${result.reasoning.substring(0, 200)}`);
+
+        // Notify the dashboard
+        await sendNotification(
+          "dashboard",
+          `Agent reviewed order #${orderId}: ${result.decision} — ${result.reasoning.substring(0, 100)}`
+        );
+
+        // Push real-time update to connected dashboards
+        const io = getIO();
+        if (io) {
+          io.emit("agent:result", {
+            orderId,
+            decision: result.decision,
+            reasoning: result.reasoning,
+            toolsUsed: result.toolsUsed,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`  [Agent Worker] Failed to process order #${orderId}:`, message);
+
+        // Notify dashboard of the failure
+        await sendNotification(
+          "dashboard",
+          `Agent failed on order #${orderId}: ${message}`
+        );
+
+        // Re-throw so BullMQ marks the job as failed (can retry later)
+        throw err;
+      }
+    } else if (taskType === "generate-summary") {
+      try {
+        const llm = createLLM();
+        console.log("  [Agent Worker] Starting Supervisor Agent — generating summary...");
+        const result = await generateSummary(llm);
+
+        console.log(`  [Agent Worker] Summary generated (${result.toolsUsed.length} tools used)`);
+        console.log(`  [Agent Worker] Summary preview: ${result.summary.substring(0, 200)}`);
+
+        // Notify the dashboard
+        await sendNotification(
+          "dashboard",
+          `Supervisor generated daily summary — ${result.toolsUsed.length} data sources checked`
+        );
+
+        // Push the full summary to connected dashboards via Socket.io
+        const io = getIO();
+        if (io) {
+          io.emit("agent:summary", {
+            summary: result.summary,
+            toolsUsed: result.toolsUsed,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error("  [Agent Worker] Failed to generate summary:", message);
+
+        await sendNotification(
+          "dashboard",
+          `Supervisor failed to generate summary: ${message}`
+        );
+
+        throw err;
+      }
+    } else {
+      console.log(`  [Agent Worker] Unknown task type: ${taskType}`);
+    }
   },
   { connection },
 );

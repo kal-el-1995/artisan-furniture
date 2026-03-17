@@ -12,6 +12,7 @@ import {
   logAgentAction,
   reviewAgentAction,
 } from "../services/agent.service.js";
+import { queueAgentTask } from "../queue/queues.js";
 
 const IdParam = Type.Object({ id: Type.Number() });
 
@@ -54,6 +55,19 @@ export async function agentRoutes(app: FastifyInstance) {
         request.body as typeof LogActionBody.static
       );
       return reply.code(201).send(action);
+    }
+  );
+
+  // ── Generate Daily Summary ─────────────────────────────────
+  // Queues a job for the Supervisor Agent to generate a daily
+  // operations summary. The agent worker picks this up and runs
+  // the LLM. Results come back via Socket.io + notification.
+  app.post(
+    "/api/agent/summary",
+    { schema: { tags: ["Agent"] } },
+    async (_request, reply) => {
+      await queueAgentTask("generate-summary", {});
+      return reply.code(202).send({ message: "Summary generation queued" });
     }
   );
 

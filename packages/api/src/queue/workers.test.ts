@@ -18,15 +18,18 @@ function waitForJob(ms = 2000): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Clean up after all tests
+// Clean up after all tests.
+// The agent worker may still be waiting for an LLM response,
+// so we force-close it to avoid hanging. The 30s timeout gives
+// other workers time to finish gracefully.
 afterAll(async () => {
-  await businessEventWorker.close();
-  await agentTaskWorker.close();
-  await notificationWorker.close();
+  await businessEventWorker.close(true);
+  await agentTaskWorker.close(true);
+  await notificationWorker.close(true);
   await businessEventsQueue.close();
   await agentTasksQueue.close();
   await notificationsQueue.close();
-});
+}, 30_000);
 
 describe("Business Event Worker", () => {
   it("order.confirmed should create production tasks for each item", async () => {

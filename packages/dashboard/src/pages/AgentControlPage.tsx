@@ -4,17 +4,37 @@
 // 1. Pending Escalations — approve or reject agent proposals
 // 2. Recent Activity — feed of all agent actions
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useAgentActions,
   usePendingEscalations,
   useReviewAction,
+  useGenerateSummary,
 } from "../hooks/useAgent";
 import { StatusBadge } from "../components/StatusBadge";
 
 export function AgentControlPage() {
   const { data: pending, isLoading: loadingPending } = usePendingEscalations();
   const { data: allActions, isLoading: loadingAll } = useAgentActions();
+  const generateSummary = useGenerateSummary();
+  const [summaryText, setSummaryText] = useState<string | null>(null);
+
+  // Listen for real-time summary results via Socket.io
+  useEffect(() => {
+    // We import io dynamically to avoid duplicate connections
+    // (useSocket in Layout.tsx handles the main connection)
+    import("socket.io-client").then(({ io }) => {
+      const socket = io("http://localhost:3000", {
+        transports: ["websocket", "polling"],
+      });
+
+      socket.on("agent:summary", (data: { summary: string }) => {
+        setSummaryText(data.summary);
+      });
+
+      return () => { socket.disconnect(); };
+    });
+  }, []);
 
   if (loadingPending || loadingAll) {
     return <div className="text-gray-500">Loading agent data...</div>;
@@ -26,6 +46,46 @@ export function AgentControlPage() {
       <p className="mt-1 text-gray-600 mb-6">
         Review AI agent actions and approve escalations.
       </p>
+
+      {/* Supervisor Summary */}
+      <section className="mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Daily Operations Summary
+          </h2>
+          <button
+            onClick={() => {
+              setSummaryText(null);
+              generateSummary.mutate();
+            }}
+            disabled={generateSummary.isPending}
+            className="px-4 py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          >
+            {generateSummary.isPending ? "Queued..." : "Generate Summary"}
+          </button>
+        </div>
+
+        {generateSummary.isPending && !summaryText && (
+          <div className="bg-blue-50 text-blue-700 text-sm p-4 rounded-lg">
+            Supervisor Agent is generating a summary. This may take a few minutes
+            (the LLM runs locally on CPU). The result will appear here automatically.
+          </div>
+        )}
+
+        {summaryText && (
+          <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
+            <pre className="whitespace-pre-wrap text-sm text-gray-800 font-mono leading-relaxed">
+              {summaryText}
+            </pre>
+          </div>
+        )}
+
+        {!generateSummary.isPending && !summaryText && (
+          <div className="bg-gray-50 text-gray-500 text-sm p-4 rounded-lg">
+            Click "Generate Summary" to have the Supervisor Agent analyze current operations.
+          </div>
+        )}
+      </section>
 
       {/* Pending Escalations */}
       <section className="mb-8">

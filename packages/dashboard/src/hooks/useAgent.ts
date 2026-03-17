@@ -39,6 +39,19 @@ export function usePendingEscalations() {
   });
 }
 
+// Trigger the Supervisor Agent to generate a daily summary
+export function useGenerateSummary() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => api.post<{ message: string }>("/api/agent/summary", {}),
+    onSuccess: () => {
+      // Refresh agent actions list (the summary gets logged as an action)
+      queryClient.invalidateQueries({ queryKey: ["agent-actions"] });
+    },
+  });
+}
+
 // Review (approve/reject) an agent action
 export function useReviewAction() {
   const queryClient = useQueryClient();

@@ -27,18 +27,12 @@ const db = drizzle(client);
 async function seed() {
   console.log("Seeding database...\n");
 
-  // ─── Clear existing data (in reverse dependency order) ───
+  // ─── Clear existing data AND reset ID counters ───
+  // TRUNCATE removes all rows and RESTART IDENTITY resets the
+  // auto-increment counters back to 1, so IDs are predictable.
+  // CASCADE handles foreign key dependencies automatically.
   console.log("Clearing existing data...");
-  await db.delete(notifications);
-  await db.delete(agentActions);
-  await db.delete(events);
-  await db.delete(payments);
-  await db.delete(shipments);
-  await db.delete(productionTasks);
-  await db.delete(orderItems);
-  await db.delete(orders);
-  await db.delete(artisans);
-  await db.delete(customers);
+  await client`TRUNCATE customers, orders, order_items, artisans, production_tasks, shipments, payments, events, agent_actions, notifications RESTART IDENTITY CASCADE`;
 
   // ─── 1. Customers ───
   console.log("Creating customers...");

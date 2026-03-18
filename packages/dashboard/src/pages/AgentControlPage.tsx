@@ -4,7 +4,7 @@
 // 1. Pending Escalations — approve or reject agent proposals
 // 2. Recent Activity — feed of all agent actions
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import {
   useAgentActions,
   usePendingEscalations,
@@ -12,29 +12,14 @@ import {
   useGenerateSummary,
 } from "../hooks/useAgent";
 import { StatusBadge } from "../components/StatusBadge";
+import { summaryStore } from "../lib/summaryStore";
 
 export function AgentControlPage() {
   const { data: pending, isLoading: loadingPending } = usePendingEscalations();
   const { data: allActions, isLoading: loadingAll } = useAgentActions();
   const generateSummary = useGenerateSummary();
-  const [summaryText, setSummaryText] = useState<string | null>(null);
-
-  // Listen for real-time summary results via Socket.io
-  useEffect(() => {
-    // We import io dynamically to avoid duplicate connections
-    // (useSocket in Layout.tsx handles the main connection)
-    import("socket.io-client").then(({ io }) => {
-      const socket = io("http://localhost:3000", {
-        transports: ["websocket", "polling"],
-      });
-
-      socket.on("agent:summary", (data: { summary: string }) => {
-        setSummaryText(data.summary);
-      });
-
-      return () => { socket.disconnect(); };
-    });
-  }, []);
+  const summaryText = useSyncExternalStore(summaryStore.subscribe, summaryStore.getSummary);
+  const waitingForSummary = useSyncExternalStore(summaryStore.subscribe, summaryStore.isWaiting);
 
   if (loadingPending || loadingAll) {
     return <div className="text-gray-500">Loading agent data...</div>;
@@ -55,17 +40,17 @@ export function AgentControlPage() {
           </h2>
           <button
             onClick={() => {
-              setSummaryText(null);
+              summaryStore.startGenerating();
               generateSummary.mutate();
             }}
-            disabled={generateSummary.isPending}
+            disabled={waitingForSummary}
             className="px-4 py-2 text-sm font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
           >
-            {generateSummary.isPending ? "Queued..." : "Generate Summary"}
+            {waitingForSummary ? "Generating..." : "Generate Summary"}
           </button>
         </div>
 
-        {generateSummary.isPending && !summaryText && (
+        {waitingForSummary && !summaryText && (
           <div className="bg-blue-50 text-blue-700 text-sm p-4 rounded-lg">
             Supervisor Agent is generating a summary. This may take a few minutes
             (the LLM runs locally on CPU). The result will appear here automatically.
@@ -80,7 +65,7 @@ export function AgentControlPage() {
           </div>
         )}
 
-        {!generateSummary.isPending && !summaryText && (
+        {!waitingForSummary && !summaryText && (
           <div className="bg-gray-50 text-gray-500 text-sm p-4 rounded-lg">
             Click "Generate Summary" to have the Supervisor Agent analyze current operations.
           </div>
@@ -132,16 +117,10 @@ export function AgentControlPage() {
                     Action
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                    Order
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                    Confidence
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
                     Status
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                    Review
+                    Reason
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
                     When
@@ -160,21 +139,11 @@ export function AgentControlPage() {
                     <td className="px-4 py-3 text-sm text-gray-600 capitalize">
                       {action.actionType.replace(/_/g, " ")}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {action.orderId ? `#${action.orderId}` : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {action.confidence ? (
-                        <ConfidenceBar value={Number(action.confidence)} />
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={action.status} />
                     </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={action.humanReviewStatus} />
+                    <td className="px-4 py-3 text-sm text-gray-500">
+                      {action.escalationReason || "—"}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {new Date(action.createdAt).toLocaleDateString()}
@@ -202,10 +171,9 @@ function EscalationCard({
     id: number;
     agentType: string;
     actionType: string;
-    orderId: number | null;
-    confidence: string | null;
-    inputData: unknown;
-    outputData: unknown;
+    input: unknown;
+    output: unknown;
+    escalationReason: string | null;
     createdAt: string;
   };
 }) {
@@ -235,22 +203,16 @@ function EscalationCard({
             </span>
           </div>
 
-          {action.orderId && (
-            <p className="text-sm text-gray-600">Order #{action.orderId}</p>
-          )}
-
-          {action.confidence && (
-            <div className="mt-2">
-              <ConfidenceBar value={Number(action.confidence)} />
-            </div>
+          {action.escalationReason && (
+            <p className="text-sm text-yellow-700 mt-1">{action.escalationReason}</p>
           )}
 
           {/* Show what the agent proposed */}
-          {action.outputData != null && (
+          {action.output != null && (
             <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
               <p className="font-medium mb-1">Agent output:</p>
               <pre className="whitespace-pre-wrap">
-                {String(JSON.stringify(action.outputData, null, 2))}
+                {String(JSON.stringify(action.output, null, 2))}
               </pre>
             </div>
           )}
@@ -306,27 +268,3 @@ function EscalationCard({
   );
 }
 
-// ─── Confidence Bar ─────────────────────────────────────────
-// Visual indicator of how confident the AI agent was (0–1).
-
-function ConfidenceBar({ value }: { value: number }) {
-  const percent = Math.round(value * 100);
-  const color =
-    percent >= 80
-      ? "bg-green-500"
-      : percent >= 50
-        ? "bg-yellow-500"
-        : "bg-red-500";
-
-  return (
-    <div className="flex items-center gap-2">
-      <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full ${color}`}
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-      <span className="text-xs text-gray-600">{percent}%</span>
-    </div>
-  );
-}

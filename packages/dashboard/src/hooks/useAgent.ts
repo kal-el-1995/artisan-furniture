@@ -10,14 +10,11 @@ export type AgentAction = {
   id: number;
   agentType: string;
   actionType: string;
-  orderId: number | null;
-  inputData: unknown;
-  outputData: unknown;
-  confidence: string | null;
+  input: unknown;
+  output: unknown;
   status: string;
-  humanReviewStatus: string;
-  humanReviewNotes: string | null;
-  reviewedAt: string | null;
+  escalationReason: string | null;
+  humanResponse: string | null;
   createdAt: string;
 };
 
@@ -27,7 +24,7 @@ export type AgentAction = {
 export function useAgentActions() {
   return useQuery({
     queryKey: ["agent-actions"],
-    queryFn: () => api.get<AgentAction[]>("/api/agent"),
+    queryFn: () => api.get<AgentAction[]>("/api/agent/actions"),
   });
 }
 
@@ -35,7 +32,7 @@ export function useAgentActions() {
 export function usePendingEscalations() {
   return useQuery({
     queryKey: ["agent-actions", "pending"],
-    queryFn: () => api.get<AgentAction[]>("/api/agent/pending"),
+    queryFn: () => api.get<AgentAction[]>("/api/agent/actions/pending"),
   });
 }
 
@@ -65,7 +62,7 @@ export function useReviewAction() {
       id: number;
       status: "approved" | "rejected";
       notes?: string;
-    }) => api.patch<AgentAction>(`/api/agent/${id}/review`, { status, notes }),
+    }) => api.patch<AgentAction>(`/api/agent/actions/${id}`, { status, humanResponse: notes }),
 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["agent-actions"] });

@@ -64,7 +64,7 @@ export async function agentRoutes(app: FastifyInstance) {
   // the LLM. Results come back via Socket.io + notification.
   app.post(
     "/api/agent/summary",
-    { schema: { tags: ["Agent"] } },
+    { schema: { tags: ["Agent"], body: Type.Object({}) } },
     async (_request, reply) => {
       await queueAgentTask("generate-summary", {});
       return reply.code(202).send({ message: "Summary generation queued" });

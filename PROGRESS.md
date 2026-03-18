@@ -216,6 +216,14 @@ This file is updated by Claude after every completed task. It is read at the sta
 - [x] Step 4: `POST /api/orders/:id/items` endpoint
   - New route + service function for adding items to an order (needed by demo script)
   - `addOrderItem()` in order.service.ts
+- [x] Step 5: Dashboard bug fixes
+  - Fixed Agent Control page — API field names didn't match React types (`input`/`output` vs `inputData`/`outputData`)
+  - Fixed agent hook URLs (`/api/agent` → `/api/agent/actions`, `/api/agent/pending` → `/api/agent/actions/pending`)
+  - Fixed review action URL (`/api/agent/:id/review` → `/api/agent/actions/:id`)
+  - Fixed `POST /api/agent/summary` — added Typebox body schema so Fastify accepts empty `{}` body
+  - Fixed "Generate Summary" button feedback — added `waitingForSummary` state so button shows "Generating..." until LLM finishes
+  - Fixed summary persistence across page navigation — moved state to global `summaryStore.ts` (useSyncExternalStore) + moved Socket.io `agent:summary` listener to `useSocket` hook (never unmounts)
+  - Removed unused ConfidenceBar component (API doesn't have confidence field)
 - [x] All 83 API tests + 5 agent tests still passing (88 total across 19 files)
 - [x] **Phase 6 milestone achieved:** One-command setup + demo showing the full POC
 

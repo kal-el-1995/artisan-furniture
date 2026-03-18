@@ -12,6 +12,7 @@ import { useEffect, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { addToast } from "../lib/toast";
+import { summaryStore } from "../lib/summaryStore";
 
 export function useSocket() {
   const queryClient = useQueryClient();
@@ -50,8 +51,10 @@ export function useSocket() {
       }
     });
 
-    // Listen for supervisor summary results
-    socket.on("agent:summary", () => {
+    // Listen for supervisor summary results — store globally so it
+    // persists even if the user navigates away from the Agent page
+    socket.on("agent:summary", (data: { summary: string }) => {
+      summaryStore.setSummary(data.summary);
       addToast("Supervisor Agent generated a daily summary");
       queryClient.invalidateQueries({ queryKey: ["agent-actions"] });
     });
